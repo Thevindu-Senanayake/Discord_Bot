@@ -6,6 +6,7 @@ import sys
 from flask import Flask
 from threading import Thread
 import os
+from dotenv import load_dotenv
 
 ROLE = "DF"
 MIN_INVITES = 1
@@ -41,6 +42,7 @@ intents.message_content = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
+load_dotenv()
 DISCORD_TOKEN = os.environ.get('DISCORD_TOKEN')
 
 DATA_FILE = "invite_data.db"
