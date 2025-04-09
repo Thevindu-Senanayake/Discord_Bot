@@ -63,6 +63,8 @@ invite_cache = {}
 @bot.event
 async def on_ready():
     logging.info(f"✅ Bot is online as {bot.user.name}")
+
+    # Cache copied from stackoverflow
     for guild in bot.guilds:
         try:
             invite_cache[guild.id] = await guild.invites()
@@ -85,6 +87,7 @@ async def invites(ctx):
     await ctx.send(f"📊 You've invited {count} members!")
     logging.info(f"🔍 {ctx.author.name} checked invites: {count}")
 
+# hithala daapu feature eka :)
 @bot.command()
 async def all_invite_details(ctx):
     # Check if the command is used in a server
@@ -156,50 +159,40 @@ async def invite_details(ctx):
     await ctx.send(leaderboard)
     logging.info(f"🔍 {ctx.author.name} requested invite leaderboard.")
 
+
+
 @bot.event
 async def on_member_join(member):
     guild = member.guild
-    try:
-        new_invites = await guild.invites()
-    except discord.Forbidden:
-        logging.warning(f"Cannot fetch invites for {guild.name}, missing permissions.")
-        return
-
+    new_invites = await guild.invites()
     old_invites = invite_cache.get(guild.id, [])
-    invite_cache[guild.id] = new_invites  # Always update the cache immediately
-
     inviter = None
-    for new in new_invites:
-        for old in old_invites:
-            if new.code == old.code and new.uses > old.uses:
-                inviter = new.inviter
-                break
-        if inviter:
-            break
 
-    if inviter is None:
-        # Could be a vanity URL or expired invite
-        logging.info(f"❓ {member.name} joined {guild.name}, but the inviter couldn't be determined.")
-        return
+    for new_invite in new_invites:
+        for old_invite in old_invites:
+            if new_invite.code == old_invite.code and new_invite.uses > old_invite.uses:
+                inviter = guild.get_member(new_invite.inviter.id)
+                if not inviter:
+                   continue
 
-    inviter_id = str(inviter.id)
-    if inviter_id not in invite_data:
-        invite_data[inviter_id] = {"total": 0, "users": []}
+    invite_cache[guild.id] = new_invites  # Update the cache
 
-    invite_data[inviter_id]["total"] += 1
-    invite_data[inviter_id]["users"].append(str(member.id))
-    save_data(invite_data)  # Make sure this function persists your invite_data
+    if inviter:
+        inviter_id = str(inviter.id)
+        if inviter_id not in invite_data:
+            invite_data[inviter_id] = {"total": 0, "users": []}
+        invite_data[inviter_id]["total"] += 1
+        invite_data[inviter_id]["users"].append(str(member.id))
+        save_data(invite_data)
 
-    logging.info(f"✅ {inviter.name} invited {member.name}! Total invites: {invite_data[inviter_id]['total']}")
+        logging.info(f"✅ {inviter.name} invited {member.name}! Total invites: {invite_data[inviter_id]['total']}")
 
-    # Give VIP role if threshold is met
-    if invite_data[inviter_id]["total"] >= MIN_INVITES:
-        role = discord.utils.get(guild.roles, name="VIP")
-        if role and role not in inviter.roles:
-            await inviter.add_roles(role)
-            if guild.system_channel:
-                await guild.system_channel.send(f"🎉 {inviter.mention} earned the **VIP** role!")
-            logging.info(f"🏆 {inviter.name} awarded VIP role!")
+        if invite_data[inviter_id]["total"] >= MIN_INVITES:
+            role = discord.utils.get(guild.roles, name="VIP")
+            if role and role not in inviter.roles:
+                await inviter.add_roles(role)
+                await guild.system_channel.send(f"🎉 {inviter.mention} earned VIP")
+                logging.info(f"🏆 {inviter.name} awarded VIP role!")
 
 @bot.event
 async def on_member_remove(member):
