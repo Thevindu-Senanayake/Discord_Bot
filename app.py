@@ -49,13 +49,16 @@ DATA_FILE = "invite_data.db"
 
 def load_data():
     with shelve.open(DATA_FILE) as db:
-        return dict(db) if db else {}
+        data = dict(db) if db else {}
+        logging.info(f"🔓 Loaded data: {data}")  # Debug the loaded data
+        return data
 
 def save_data(data):
     with shelve.open(DATA_FILE) as db:
         db.clear()
         for key, value in data.items():
             db[key] = value
+        logging.info(f"🔒 Saved data: {data}")  # Add logging to track saved data
 
 invite_data = load_data()
 invite_cache = {}
@@ -63,7 +66,6 @@ invite_cache = {}
 @bot.event
 async def on_ready():
     logging.info(f"✅ Bot is online as {bot.user.name}")
-
     # Cache copied from stackoverflow
     for guild in bot.guilds:
         try:
@@ -87,26 +89,22 @@ async def invites(ctx):
     await ctx.send(f"📊 You've invited {count} members!")
     logging.info(f"🔍 {ctx.author.name} checked invites: {count}")
 
-# hithala daapu feature eka :)
 @bot.command()
 async def all_invite_details(ctx):
-    # Check if the command is used in a server
+    """Fetch and display invite details for the guild"""
     if ctx.guild is None:
         await ctx.send("❌ This command can only be used in a server, not in DMs.")
         return
 
-    # Get the Member object
     member = ctx.guild.get_member(ctx.author.id)
     if not member:
         await ctx.send("❌ Could not fetch your member details. Try again.")
         return
 
-    # Check if user has role 'X' or is 'thevindu_senanayake'
     if ROLE not in [role.name for role in member.roles] and member.name != "thevindu_senanayake":
         await ctx.send("❌ You don't have the required role to access invite details.")
         return
 
-    # Fetch invite details
     guild = ctx.guild
     details = []
     for invite in invite_cache.get(guild.id, []):
@@ -123,33 +121,28 @@ async def all_invite_details(ctx):
 
 @bot.command()
 async def invite_details(ctx):
-    # Check if the command is used in a server
+    """Fetch and display the invite leaderboard"""
     if ctx.guild is None:
         await ctx.send("❌ This command can only be used in a server, not in DMs.")
         return
 
-    # Get the Member object
     member = ctx.guild.get_member(ctx.author.id)
     if not member:
         await ctx.send("❌ Could not fetch your member details. Try again.")
         return
 
-    # Check if user has role 'X' or is 'thevindu_senanayake'
     if ROLE not in [role.name for role in member.roles] and member.name != "thevindu_senanayake":
         await ctx.send("❌ You don't have the required role to access invite details.")
         return
 
-    # Load invite data from database
     invite_data = load_data()
+    logging.info(f"Invite data loaded: {invite_data}")  # Debugging the loaded invite data
 
-    if not invite_data or len({user_id: data for user_id, data in invite_data.items() if data["total"] > 0}) == 0:
+    if not invite_data:
         await ctx.send("❌ No invite data available.")
         return
 
-    # Sort users by total invites in descending order
     sorted_invites = sorted(invite_data.items(), key=lambda x: x[1]["total"], reverse=True)
-
-    # Format the leaderboard output
     leaderboard = "**📊 Invite Leaderboard**\n"
     for i, (user_id, data) in enumerate(sorted_invites, start=1):
         user = ctx.guild.get_member(int(user_id))
@@ -159,10 +152,9 @@ async def invite_details(ctx):
     await ctx.send(leaderboard)
     logging.info(f"🔍 {ctx.author.name} requested invite leaderboard.")
 
-
-
 @bot.event
 async def on_member_join(member):
+    """Handle a member joining the server"""
     guild = member.guild
     new_invites = await guild.invites()
     old_invites = invite_cache.get(guild.id, [])
@@ -173,7 +165,7 @@ async def on_member_join(member):
             if new_invite.code == old_invite.code and new_invite.uses > old_invite.uses:
                 inviter = guild.get_member(new_invite.inviter.id)
                 if not inviter:
-                   continue
+                    continue
 
     invite_cache[guild.id] = new_invites  # Update the cache
 
@@ -196,6 +188,7 @@ async def on_member_join(member):
 
 @bot.event
 async def on_member_remove(member):
+    """Handle a member leaving the server"""
     guild = member.guild
     member_id = str(member.id)
 
